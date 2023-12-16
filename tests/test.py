@@ -23,13 +23,10 @@ def init_network_params(key):
   conv_params1 = 1e-2 * random.normal(keys[0], (3, 1, 4, 4))
   conv_params2 = 1e-2 * random.normal(keys[1], (16, 3, 4, 4))
   mlp_params = random_layer_params(576, 10, keys[2])
-  return [conv_params1, conv_params2, mlp_params]
+  return [conv_params1, conv_params2, mlp_params[0], mlp_params[1]]
 
-image_size = 3 * 32 * 32
-layer_sizes = [image_size, 512, 256, 10]
 learning_rate = 0.001
 batch_size = 256
-n_targets = 10
 params = init_network_params(random.PRNGKey(0))
 params = device_put(params)
 
@@ -38,33 +35,46 @@ from jax.scipy.special import logsumexp
 def relu(x):
   return jnp.maximum(0, x)
 
-def predict(params, image):
-  # per-example predictions
-  conv_params1, conv_params2, mlp_params = params
-  #print("image:", image.shape)
+class CNN:
+    def __init__(self):
+        keys = random.split(random.PRNGKey(0), 3)
+        scale = 1e-2
+        self.conv1 = scale * random.normal(keys[0], (3, 1, 4, 4))
+        self.conv2 = scale * random.normal(keys[1], (16, 3, 4, 4))
 
-  activations = lax.conv_general_dilated(
-    image[None, :],
-    conv_params1,
-    window_strides=(2, 2),
-    padding="VALID",
-    dimension_numbers=('NCHW', 'OIHW', 'NCHW'),
-    feature_group_count=3
-  )
-  activations = relu(activations)
-  #print("activations:", activations.shape)
-  activations = lax.conv_general_dilated(
-    activations,
-    conv_params2,
-    window_strides=(2, 2),
-    padding="VALID",
-    dimension_numbers=('NCHW', 'OIHW', 'NCHW'),
-  )
-  activations = relu(activations)
-  w, b = mlp_params
-  outputs = jnp.dot(w, jnp.ravel(activations)) + b
-  logits = relu(outputs)
-  return logits - logsumexp(logits)
+        w_key, b_key = random.split(keys[2])
+        n, m = 10, 576
+        self.mlp_w = scale * random.normal(w_key, (n, m))
+        self.mlp_b = scale * random.normal(b_key, (n,))
+        self.params = [self.conv1, self.conv2, self.mlp_w, self.mlp_b]
+
+    @staticmethod
+    def predict(params, image):
+      # per-example predictions
+      conv_params1, conv_params2, w, b = params
+      #print("image:", image.shape)
+
+      activations = lax.conv_general_dilated(
+        image[None, :],
+        conv_params1,
+        window_strides=(2, 2),
+        padding="VALID",
+        dimension_numbers=('NCHW', 'OIHW', 'NCHW'),
+        feature_group_count=3
+      )
+      activations = jnp.maximum(0, activations)
+      #print("activations:", activations.shape)
+      activations = lax.conv_general_dilated(
+        activations,
+        conv_params2,
+        window_strides=(2, 2),
+        padding="VALID",
+        dimension_numbers=('NCHW', 'OIHW', 'NCHW'),
+      )
+      activations = jnp.maximum(0, activations)
+      outputs = jnp.dot(w, jnp.ravel(activations)) + b
+      logits = jnp.maximum(0, outputs)
+      return logits - logsumexp(logits)
   #return nn.softmax(logits)
 
 # This works on single examples
@@ -72,8 +82,7 @@ with open("/home/robin/Downloads/cifar-10-batches-py/data_batch_1", "rb") as fp:
     batch1 = pickle.load(fp, encoding='bytes')
     x = jnp.array(batch1[b"labels"])
 
-random_flattened_images = random.normal(random.PRNGKey(1), (batch_size, image_size))
-batched_predict = vmap(predict, in_axes=(None, 0))
+batched_predict = vmap(CNN.predict, in_axes=(None, 0))
 
 def one_hot(x, k, dtype=jnp.float32):
   """Create a one-hot encoding of x of size k."""
