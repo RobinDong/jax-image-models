@@ -43,6 +43,8 @@ class CNN:
         activations = activations.reshape((images.shape[0], -1))
         #print("activations:", activations.shape)
         idim = activations.shape[0] * activations.shape[1]
+        print("act:", activations.shape)
+        print("mlp_w:", params["mlp_w"].shape)
         outputs = lax.dot_general(
             activations,
             params["mlp_w"],
