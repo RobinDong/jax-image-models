@@ -48,7 +48,7 @@ def batch_norm(params, inputs):
 
 class ResNet:
     @staticmethod
-    def init(stages: list[int], bottleneck: bool, scale: float = 1e-2):
+    def init(stages: list[int], bottleneck: bool, classes: int = 1000, scale: float = 1e-2):
         keys = random.split(random.PRNGKey(0), 1 + len(stages) + 1)
         sub_keys = random.split(keys[0], 2)
         conv1 = scale * random.normal(sub_keys[0], (64, 3, 7, 7))
@@ -88,7 +88,7 @@ class ResNet:
                 bn = scale * random.normal(sub_keys[9], (2,))
                 params |= {f"downsample{index+2}": downsample, f"bn{index+2}": bn}
         sub_keys = random.split(keys[-1], 2)
-        n, m = 1000, 512  # classification for imagenet
+        n, m = classes, 512  # classification for imagenet
         mlp_w = scale * random.normal(sub_keys[0], (n, m))
         mlp_b = scale * random.normal(sub_keys[1], (n,))
         params |= {"mlp_w": mlp_w, "mlp_b": mlp_b}
@@ -99,8 +99,7 @@ class ResNet:
         out = inp
         for stage in range(2, 6):
             layers = len([name for name in params.keys() if name[:6] == f"conv{stage}_"]) // 2
-            print("stage:", stage, layers)
-            for layer in (1, layers+1):
+            for layer in range(1, layers+1, 2):
                 shortcut = out
                 out = lax.conv_general_dilated(
                     out,
@@ -130,14 +129,10 @@ class ResNet:
                     shortcut = batch_norm(params[f"bn{stage}"], shortcut)
                 out += shortcut
                 out = nn.relu(out)
-                print(f"out{stage}_{layer}:", out.shape)
         return out
 
     @staticmethod
     def infer(params, images):
-        print("params:", params.keys())
-        for name, value in params.items():
-            print(name, value.shape)
         # stem
         out = lax.conv_general_dilated(
             images,
@@ -151,6 +146,6 @@ class ResNet:
         out = max_pool(out, (3, 3), (2, 2))
         out = ResNet.basic_blocks(params, out)
         out = avg_pool(out, (7, 7), (7, 7))
-        out = lax.reshape(out, (out.shape[0], 512))
+        out = out.reshape((images.shape[0], -1))
         out = lax.dot_general(out, params["mlp_w"], ((1, 1), ((), ())),)
-        return nn.softmax(out)
+        return out
