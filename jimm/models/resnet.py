@@ -50,25 +50,24 @@ class ResNet:
     @staticmethod
     def init(stages: list[int], bottleneck: bool, classes: int = 1000, scale: float = 1e-2):
         keys = random.split(random.PRNGKey(0), 1 + len(stages) + 1)
-        sub_keys = random.split(keys[0], 2)
-        conv1 = scale * random.normal(sub_keys[0], (64, 3, 7, 7))
-        bn1 = scale * random.normal(sub_keys[1], (2,))
+        conv1 = scale * random.normal(keys[0], (64, 3, 7, 7))
+        bn1 = jnp.array([1.0, 0.0])
         params = {"conv1": conv1, "bn1": bn1}
         if bottleneck:
             pass
         else:
-            sub_keys = random.split(keys[1], stages[0] * 8)
             # conv2
-            layers = stages[0] * 4
-            for index in range(0, layers, 2):
+            layers = stages[0] * 2
+            sub_keys = random.split(keys[1], layers)
+            for index in range(layers):
                 conv = scale * random.normal(sub_keys[index], (64, 64, 3, 3))
-                bn = scale * random.normal(sub_keys[index + 1], (2,))
-                params |= {f"conv2_{index//2+1}": conv, f"bn2_{index//2+1}": bn}
+                bn = jnp.array([1.0, 0.0])
+                params |= {f"conv2_{index+1}": conv, f"bn2_{index+1}": bn}
             # conv3 conv4 conv5
             for index, depth in [(1, 128), (2, 256), (3, 512)]:
-                sub_keys = random.split(keys[index + 1], stages[index] * 10)
-                layers = stages[index] * 4
-                for sub_index in range(0, layers, 2):
+                layers = stages[index] * 2
+                sub_keys = random.split(keys[index + 1], layers + 1)
+                for sub_index in range(layers):
                     if sub_index == 0:  # first conv layer of this stage
                         conv = scale * random.normal(
                             sub_keys[sub_index], (depth, depth // 2, 3, 3)
@@ -77,15 +76,15 @@ class ResNet:
                         conv = scale * random.normal(
                             sub_keys[sub_index], (depth, depth, 3, 3)
                         )
-                    bn = scale * random.normal(sub_keys[sub_index + 1], (2,))
+                    bn = jnp.array([1.0, 0.0])
                     params |= {
-                        f"conv{index+2}_{sub_index//2+1}": conv,
-                        f"bn{index+2}_{sub_index//2+1}": bn,
+                        f"conv{index+2}_{sub_index+1}": conv,
+                        f"bn{index+2}_{sub_index+1}": bn,
                     }
                 downsample = scale * random.normal(
-                    sub_keys[8], (depth, depth // 2, 1, 1)
+                    sub_keys[-1], (depth, depth // 2, 1, 1)
                 )
-                bn = scale * random.normal(sub_keys[9], (2,))
+                bn = jnp.array([1.0, 0.0])
                 params |= {f"downsample{index+2}": downsample, f"bn{index+2}": bn}
         sub_keys = random.split(keys[-1], 2)
         n, m = classes, 512  # classification for imagenet
