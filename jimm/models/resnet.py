@@ -90,7 +90,7 @@ class ResNet:
             if index == 0:
                 conv = scale * random.normal(sub_keys[index], (64, 64, 1, 1))
             else:
-                conv = scale * random.normal(sub_keys[index], (64, 4*64, 1, 1))
+                conv = scale * random.normal(sub_keys[index], (64, 4 * 64, 1, 1))
             bn = jnp.array([1.0, 0.0])
             params |= {f"conv2_{index+1}": conv, f"bn2_{index+1}": bn}
             conv = scale * random.normal(sub_keys[index + 1], (64, 64, 3, 3))
@@ -101,7 +101,7 @@ class ResNet:
             params |= {f"conv2_{index+3}": conv, f"bn2_{index+3}": bn}
         downsample = scale * random.normal(sub_keys[-1], (256, 64, 1, 1))
         bn = jnp.array([1.0, 0.0])
-        params |= {f"downsample2": downsample, f"bn2": bn}
+        params |= {"downsample2": downsample, "bn2": bn}
         # conv3 conv4 conv5
         for index, depth in [(1, 128), (2, 256), (3, 512)]:
             layers = stages[index] * 3
@@ -140,7 +140,9 @@ class ResNet:
                     f"conv{index+2}_{sub_index+3}": conv,
                     f"bn{index+2}_{sub_index+3}": bn,
                 }
-            downsample = scale * random.normal(sub_keys[-1], (depth * 4, depth * 2, 1, 1))
+            downsample = scale * random.normal(
+                sub_keys[-1], (depth * 4, depth * 2, 1, 1)
+            )
             bn = jnp.array([1.0, 0.0])
             params |= {f"downsample{index+2}": downsample, f"bn{index+2}": bn}
         return params
@@ -308,6 +310,16 @@ class resnet50:
     @staticmethod
     def init(classes: int = 1000, scale: float = 1e-2):
         return ResNet.init([3, 4, 6, 3], bottleneck=True, classes=classes, scale=scale)
+
+    @staticmethod
+    def infer(params, images):
+        return ResNet.infer(params, images)
+
+
+class resnet101:
+    @staticmethod
+    def init(classes: int = 1000, scale: float = 1e-2):
+        return ResNet.init([3, 4, 23, 3], bottleneck=True, classes=classes, scale=scale)
 
     @staticmethod
     def infer(params, images):

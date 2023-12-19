@@ -6,17 +6,17 @@ import jax.numpy as jnp
 
 from jax import jit, nn, device_put
 from jax.scipy.special import logsumexp
-from jimm.models import resnet50
+from jimm.models import resnet101
 
 
 def accuracy(params, images, targets):
     target_class = jnp.argmax(targets, axis=1)
-    predicted_class = jnp.argmax(resnet50.infer(params, images), axis=1)
+    predicted_class = jnp.argmax(resnet101.infer(params, images), axis=1)
     return jnp.mean(predicted_class == target_class)
 
 
 def loss_fn(params, images, targets):
-    preds = resnet50.infer(params, images)
+    preds = resnet101.infer(params, images)
     preds = preds - logsumexp(preds)
     return -jnp.mean(preds * targets)
 
@@ -41,9 +41,7 @@ test_labels = nn.one_hot(device_put(jnp.array(test_data[b"fine_labels"])), CLASS
 loss_and_grad_fn = jit(jax.value_and_grad(loss_fn))
 update_fn = jit(functools.partial(jax.tree_map, lambda p, g: p - learning_rate * g))
 
-params = resnet50.init(
-    classes=CLASSES, scale=1e-2
-)  # resnet50
+params = resnet101.init(classes=CLASSES, scale=1e-2)  # resnet50
 for name in params.keys():
     print(name, params[name].shape)
 
