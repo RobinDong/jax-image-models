@@ -48,7 +48,9 @@ def batch_norm(params, inputs):
 
 class ResNet:
     @staticmethod
-    def init(stages: list[int], bottleneck: bool, classes: int = 1000, scale: float = 1e-2):
+    def init(
+        stages: list[int], bottleneck: bool, classes: int = 1000, scale: float = 1e-2
+    ):
         keys = random.split(random.PRNGKey(0), 1 + len(stages) + 1)
         conv1 = scale * random.normal(keys[0], (64, 3, 7, 7))
         bn1 = jnp.array([1.0, 0.0])
@@ -97,8 +99,11 @@ class ResNet:
     def basic_blocks(params, inp):
         out = inp
         for stage in range(2, 6):
-            layers = len([name for name in params.keys() if name[:6] == f"conv{stage}_"]) // 2
-            for layer in range(1, layers+1, 2):
+            layers = (
+                len([name for name in params.keys() if name[:6] == f"conv{stage}_"])
+                // 2
+            )
+            for layer in range(1, layers + 1, 2):
                 shortcut = out
                 out = lax.conv_general_dilated(
                     out,
@@ -146,5 +151,29 @@ class ResNet:
         out = ResNet.basic_blocks(params, out)
         out = avg_pool(out, (7, 7), (7, 7))
         out = out.reshape((images.shape[0], -1))
-        out = lax.dot_general(out, params["mlp_w"], ((1, 1), ((), ())),)
+        out = lax.dot_general(
+            out,
+            params["mlp_w"],
+            ((1, 1), ((), ())),
+        )
         return out
+
+
+class resnet18:
+    @staticmethod
+    def init(classes: int = 1000, scale: float = 1e-2):
+        return ResNet.init([2, 2, 2, 2], bottleneck=False, classes=classes, scale=scale)
+
+    @staticmethod
+    def infer(params, images):
+        return ResNet.infer(params, images)
+
+
+class resnet34:
+    @staticmethod
+    def init(classes: int = 1000, scale: float = 1e-2):
+        return ResNet.init([3, 4, 6, 3], bottleneck=False, classes=classes, scale=scale)
+
+    @staticmethod
+    def infer(params, images):
+        return ResNet.infer(params, images)
